@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Xerox Youtube Toolsv1",
+  "version": "1.0",
+  "description": "やるべきことに集中するためのツール",
+  "icons": {
+    "16": "icon.png",
+    "48": "icon.png",
+    "128": "icon.png"
+  },
+  "permissions": [
+    "storage"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://www.youtube.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["icon.png", "setting.png"],
+      "matches": ["*://www.youtube.com/*"]
+    }
+  ]
+}

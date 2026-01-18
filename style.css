@@ -1,0 +1,227 @@
+#xerox-settings-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  transition: background-color 0.2s;
+}
+#xerox-settings-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+#xerox-settings-btn img {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+}
+
+#xerox-settings-panel {
+  position: absolute;
+  top: 50px;
+  right: 100px;
+  width: 340px;
+  background-color: #282828;
+  color: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  z-index: 9999;
+  padding: 16px;
+  font-family: "Roboto", Arial, sans-serif;
+  font-size: 14px;
+  max-height: 80vh;
+  overflow-y: auto;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+html:not([dark]) #xerox-settings-panel {
+  background-color: #fff;
+  color: #030303;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+  border: 1px solid #ccc;
+}
+
+.xerox-promo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+html:not([dark]) .xerox-promo {
+  border-bottom: 1px solid #eee;
+}
+.xerox-promo:hover {
+  opacity: 0.8;
+}
+.xerox-promo img {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+}
+.xerox-promo-text {
+  font-size: 11px;
+  line-height: 1.4;
+  color: #aaa;
+}
+html:not([dark]) .xerox-promo-text {
+  color: #606060;
+}
+.xerox-promo-link {
+  color: #3ea6ff;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.xerox-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding: 4px 0;
+}
+.xerox-label {
+  flex: 1;
+}
+.xerox-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+}
+.xerox-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.xerox-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #555;
+  transition: .4s;
+  border-radius: 20px;
+}
+.xerox-slider:before {
+  position: absolute;
+  content: "";
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  transition: .4s;
+  border-radius: 50%;
+}
+input:checked + .xerox-slider {
+  background-color: #3ea6ff;
+}
+input:checked + .xerox-slider:before {
+  transform: translateX(16px);
+}
+
+.xerox-section-title {
+  font-size: 12px;
+  font-weight: bold;
+  color: #aaa;
+  margin-top: 16px;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.xerox-timer-input {
+  width: 50px;
+  background: transparent;
+  border: 1px solid #555;
+  color: inherit;
+  border-radius: 4px;
+  padding: 2px 5px;
+  margin-left: 5px;
+}
+
+.xerox-tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 12px;
+  margin-right: 8px;
+  background-color: rgba(255,255,255,0.1);
+  color: inherit;
+  border-radius: 16px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  user-select: none;
+  border: none;
+}
+.xerox-tool-btn:hover {
+  background-color: rgba(255,255,255,0.2);
+}
+html:not([dark]) .xerox-tool-btn {
+  background-color: rgba(0,0,0,0.05);
+}
+html:not([dark]) .xerox-tool-btn:hover {
+  background-color: rgba(0,0,0,0.1);
+}
+
+body.xerox-hide-shorts-tab ytd-guide-entry-renderer a[title="ショート"],
+body.xerox-hide-shorts-tab ytd-guide-entry-renderer a[title="Shorts"],
+body.xerox-hide-shorts-tab ytd-mini-guide-entry-renderer[aria-label="ショート"],
+body.xerox-hide-shorts-tab ytd-mini-guide-entry-renderer[aria-label="Shorts"] {
+  display: none !important;
+}
+body.xerox-hide-shorts-shelf ytd-rich-shelf-renderer[is-shorts],
+body.xerox-hide-shorts-shelf ytd-reel-shelf-renderer {
+  display: none !important;
+}
+
+body.xerox-hide-comments #comments {
+  display: none !important;
+}
+
+body.xerox-hide-chat #chat, 
+body.xerox-hide-chat ytd-live-chat-frame {
+  display: none !important;
+}
+
+body.xerox-hide-endscreen .ytp-ce-element {
+  display: none !important;
+}
+
+body.xerox-fade-watched ytd-rich-item-renderer:has(#progress[style*="100%"]) ytd-thumbnail,
+body.xerox-fade-watched ytd-video-renderer:has(#progress[style*="100%"]) ytd-thumbnail,
+body.xerox-fade-watched ytd-grid-video-renderer:has(#progress[style*="100%"]) ytd-thumbnail {
+  opacity: 0.3 !important;
+  filter: grayscale(100%) !important;
+}
+
+body.xerox-disable-miniplayer ytd-miniplayer {
+  display: none !important;
+}
+
+#xerox-lock-screen {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background: #000;
+  color: #fff;
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+}
+
+#xerox-timer-display {
+  font-size: 14px;
+  font-weight: bold;
+  color: #3ea6ff;
+  margin-right: 15px;
+  display: flex;
+  align-items: center;
+}
