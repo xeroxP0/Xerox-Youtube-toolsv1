@@ -4,9 +4,12 @@ const defaultSettings = {
     redirectShorts: true,
     fixSpeed: false,
     speedValue: "1.0",
+    disableSpeedForMusic: false,
     autoTheater: false,
     autoLoop: false,
     showExtraButtons: true,
+    forceMusicCategory: false,
+    hideRelated: false,
     hideComments: false,
     hideChat: false,
     hideEndScreen: false,
@@ -20,9 +23,7 @@ let settingIconUrl = "";
 try {
     iconUrl = chrome.runtime.getURL("icon.png");
     settingIconUrl = chrome.runtime.getURL("setting.png");
-} catch (e) {
-    console.error(e);
-}
+} catch (e) {}
 
 (async function init() {
     try {
@@ -41,6 +42,11 @@ try {
         
         observer.observe(document.body, { subtree: true, childList: true });
         onUrlChange();
+
+        // 初回実行
+        if (location.pathname === "/" && settings.forceMusicCategory) {
+            enforceMusicCategoryLoop();
+        }
 
     } catch (e) {}
 })();
@@ -107,11 +113,24 @@ function injectStyles() {
         .xerox-hide-comments #comments { display: none !important; }
         .xerox-hide-chat #chat { display: none !important; }
         .xerox-hide-endscreen .ytp-ce-element { display: none !important; }
+        .xerox-hide-related #related { display: none !important; }
+        .xerox-hide-related ytd-watch-next-secondary-results-renderer { display: none !important; }
         
         .xerox-fade-watched ytd-rich-item-renderer:has(ytd-thumbnail-overlay-resume-playback-renderer),
         .xerox-fade-watched ytd-video-renderer:has(ytd-thumbnail-overlay-resume-playback-renderer),
         .xerox-fade-watched ytd-grid-video-renderer:has(ytd-thumbnail-overlay-resume-playback-renderer) { 
             display: none !important; 
+        }
+
+        /* 音楽カテゴリ強制時、選択されるまではグリッドを隠してチラつき防止 */
+        body.xerox-force-music-mode:not(.xerox-music-selected) ytd-rich-grid-renderer {
+            opacity: 0 !important;
+            pointer-events: none !important;
+        }
+        
+        /* 音楽カテゴリ以外のチップを非表示 */
+        body.xerox-force-music-mode ytd-feed-filter-chip-bar-renderer yt-chip-cloud-chip-renderer:not([aria-selected="true"]) {
+            display: none !important;
         }
         
         #xerox-settings-btn { 
@@ -192,29 +211,141 @@ function onUrlChange() {
                 return;
             }
         }
+        
+        // ページ遷移時にクラスリセット
+        document.body.classList.remove('xerox-music-selected');
+
         if (location.pathname === "/watch") {
             setTimeout(() => {
                 applyPlaybackTools();
                 injectExtraButtons();
             }, 1000);
-            setTimeout(injectExtraButtons, 3000);
+            setTimeout(() => {
+                // 遅延ロードされるメタデータを考慮して再実行
+                applyPlaybackTools();
+                injectExtraButtons();
+            }, 3000);
+        } else if (location.pathname === "/" && settings.forceMusicCategory) {
+            enforceMusicCategoryLoop();
         }
     } catch (e) {}
+}
+
+// ホーム画面での音楽カテゴリ強制ループ
+function enforceMusicCategoryLoop() {
+    if (!settings.forceMusicCategory || location.pathname !== "/") return;
+    
+    // まだ選択されていなければトライ
+    const interval = setInterval(() => {
+        if (location.pathname !== "/") {
+            clearInterval(interval);
+            return;
+        }
+        
+        const success = forceMusicCategorySelect();
+        if (success) {
+            document.body.classList.add('xerox-music-selected');
+            // 成功しても念のため少しの間監視を続ける（SPA遷移対策）
+            setTimeout(() => clearInterval(interval), 2000);
+        }
+    }, 500);
+}
+
+function forceMusicCategorySelect() {
+    try {
+        const chips = document.querySelectorAll('yt-chip-cloud-chip-renderer');
+        let musicChip = null;
+
+        for (const chip of chips) {
+            const text = chip.innerText.trim();
+            // 日本語・英語対応
+            if (text === "音楽" || text === "Music") {
+                musicChip = chip;
+                break;
+            }
+        }
+
+        if (musicChip) {
+            if (musicChip.getAttribute('aria-selected') === 'true') {
+                return true; // 既に選択済み
+            } else {
+                musicChip.click();
+                return true; // クリックした
+            }
+        }
+        return false; // 見つからない
+    } catch(e) { return false; }
 }
 
 function applyStaticStyles() {
     if (!document.body) return;
     toggleBodyClass('xerox-hide-shorts-tab', settings.removeShortsTab);
     toggleBodyClass('xerox-hide-shorts-shelf', settings.removeShortsShelf);
+    toggleBodyClass('xerox-hide-related', settings.hideRelated);
     toggleBodyClass('xerox-hide-comments', settings.hideComments);
     toggleBodyClass('xerox-hide-chat', settings.hideChat);
     toggleBodyClass('xerox-hide-endscreen', settings.hideEndScreen);
     toggleBodyClass('xerox-fade-watched', settings.fadeWatched);
+    toggleBodyClass('xerox-force-music-mode', settings.forceMusicCategory);
 }
 
 function toggleBodyClass(className, isActive) {
     if (isActive) document.body.classList.add(className);
     else document.body.classList.remove(className);
+}
+
+// 音楽動画判定ロジック (強化版)
+function isMusicVideo() {
+    // 1. 公式アーティストバッジ (♪マーク)
+    const badge = document.querySelector('ytd-channel-name .ytd-badge-supported-renderer');
+    if (badge) {
+        const svgPath = badge.querySelector('path');
+        if (svgPath) {
+            const d = svgPath.getAttribute('d');
+            // ♪マークのパスデータの一部
+            if (d && d.includes('M12 3v10.55')) return true;
+        }
+        // ツールチップ確認
+        const tooltip = badge.querySelector('tp-yt-paper-tooltip');
+        if (tooltip) {
+            const txt = tooltip.innerText.toLowerCase();
+            if (txt.includes('公式') || txt.includes('official') || txt.includes('artist')) return true;
+        }
+    }
+
+    // 2. チャンネル名が「- Topic」で終わる (自動生成チャンネル)
+    const channelEl = document.querySelector('ytd-channel-name a');
+    const channelName = channelEl ? channelEl.innerText.trim() : "";
+    if (channelName.endsWith(' - Topic') || channelName.endsWith(' - トピック')) return true;
+
+    // 3. ミックスリスト再生中 (RDリストなど)
+    const urlParams = new URLSearchParams(window.location.search);
+    const listId = urlParams.get('list');
+    if (listId && (listId.startsWith('RD') || listId.startsWith('OLAK5uy_') || listId.startsWith('LM'))) return true;
+
+    // 4. メタデータセクション (曲・アーティスト情報)
+    if (document.querySelector('ytd-rich-metadata-row-renderer')) return true;
+    
+    // 5. 概要欄の自動生成クレジット ("Provided to YouTube")
+    const description = document.querySelector('#description-inline-expander') || document.querySelector('#description');
+    if (description && description.innerText.includes('Provided to YouTube')) return true;
+
+    // 6. タイトル・チャンネル名のキーワード判定 (補助)
+    const titleEl = document.querySelector('h1.ytd-watch-metadata');
+    const title = titleEl ? titleEl.innerText.toLowerCase() : "";
+    const channelLower = channelName.toLowerCase();
+    
+    const keywords = [
+        "mv", "music video", "official video", "official audio", 
+        "cover", "feat.", "ft.", "original song", "full album", 
+        "歌ってみた", "オリジナル曲", "ミュージックビデオ", 
+        "lyric video", "remix"
+    ];
+
+    if (keywords.some(k => title.includes(k))) return true;
+    if (channelLower.includes("music") || channelLower.includes("records") || channelLower.includes("vevo")) return true;
+
+    return false;
 }
 
 function applyPlaybackTools() {
@@ -223,9 +354,15 @@ function applyPlaybackTools() {
         if (!video) return;
 
         if (settings.fixSpeed) {
-            const speed = parseFloat(settings.speedValue);
-            if (!isNaN(speed)) video.playbackRate = speed;
+            // 音楽動画の場合は通常速度、それ以外は指定速度
+            if (settings.disableSpeedForMusic && isMusicVideo()) {
+                video.playbackRate = 1.0;
+            } else {
+                const speed = parseFloat(settings.speedValue);
+                if (!isNaN(speed)) video.playbackRate = speed;
+            }
         }
+        
         if (settings.autoLoop) video.loop = true;
         if (settings.autoTheater) {
             const theaterBtn = document.querySelector('.ytp-size-button');
@@ -252,12 +389,12 @@ function injectExtraButtons() {
 
         const ssBtn = document.createElement('button');
         ssBtn.className = 'xerox-tool-btn';
-        ssBtn.innerText = 'スクショ';
+        ssBtn.innerText = '📷 スクショ';
         ssBtn.onclick = takeScreenshot;
 
         const urlBtn = document.createElement('button');
         urlBtn.className = 'xerox-tool-btn';
-        urlBtn.innerText = '時間URL';
+        urlBtn.innerText = '🔗 時間URL';
         urlBtn.onclick = copyTimestampUrl;
 
         container.appendChild(ssBtn);
@@ -310,20 +447,23 @@ function generatePanelHTML() {
 
     html += '<div class="xerox-section-title">ショート動画対策</div>';
     html += createToggle('「ショート」タブを隠す', 'removeShortsTab');
-    html += createToggle('おすすめのショートを隠す', 'removeShortsShelf');
+    html += createToggle('おすすめのショート列を隠す', 'removeShortsShelf');
     html += createToggle('ショートを通常プレイヤーで再生', 'redirectShorts');
 
     html += '<div class="xerox-section-title">再生ツール</div>';
     html += createToggle('再生速度を固定する', 'fixSpeed');
+    html += createToggle('音楽動画は通常速度にする', 'disableSpeedForMusic');
     html += '<div class="xerox-input-group">';
     html += '  <span style="font-size:12px; color:var(--xerox-text-sec);">速度(0.1～16):</span>';
     html += '  <input type="number" id="speedInput" class="xerox-timer-input" step="0.1" min="0.1" max="16" value="' + settings.speedValue + '">';
     html += '</div>';
-    html += createToggle('強制シアターモード', 'autoTheater');
-    html += createToggle('強制ループ再生', 'autoLoop');
-    html += createToggle('便利ボタン', 'showExtraButtons');
+    html += createToggle('強制でシアターモード', 'autoTheater');
+    html += createToggle('強制でループ再生', 'autoLoop');
+    html += createToggle('便利ボタンを表示', 'showExtraButtons');
 
     html += '<div class="xerox-section-title">表示の整理</div>';
+    html += createToggle('ホームで「音楽」タブを自動選択', 'forceMusicCategory');
+    html += createToggle('関連動画を非表示', 'hideRelated');
     html += createToggle('コメント欄を隠す', 'hideComments');
     html += createToggle('ライブチャットを隠す', 'hideChat');
     html += createToggle('動画終わりの関連動画を隠す', 'hideEndScreen');
