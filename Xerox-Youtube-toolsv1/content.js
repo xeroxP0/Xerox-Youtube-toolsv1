@@ -23,7 +23,9 @@ let settingIconUrl = "";
 try {
     iconUrl = chrome.runtime.getURL("icon.png");
     settingIconUrl = chrome.runtime.getURL("setting.png");
-} catch (e) {}
+} catch (e) {
+    console.error(e);
+}
 
 (async function init() {
     try {
@@ -43,8 +45,9 @@ try {
         observer.observe(document.body, { subtree: true, childList: true });
         onUrlChange();
 
-        // 初回実行
+        // 初回ロード時のチェック
         if (location.pathname === "/" && settings.forceMusicCategory) {
+            document.body.classList.add('xerox-force-music-mode');
             enforceMusicCategoryLoop();
         }
 
@@ -71,6 +74,8 @@ async function saveSettings() {
     try {
         await chrome.storage.local.set({ xeroxSettings: settings });
         applyStaticStyles();
+        // 設定保存時も即時反映のためURLチェックを行う
+        onUrlChange();
     } catch (e) {}
 }
 
@@ -212,8 +217,17 @@ function onUrlChange() {
             }
         }
         
-        // ページ遷移時にクラスリセット
+        // ページ遷移時は一度クラスをリセット
         document.body.classList.remove('xerox-music-selected');
+
+        // ホーム画面かつ設定ONの場合のみクラス付与
+        if (location.pathname === "/" && settings.forceMusicCategory) {
+            document.body.classList.add('xerox-force-music-mode');
+            enforceMusicCategoryLoop();
+        } else {
+            // ホーム以外なら強制モードクラスを削除（これがバグ修正の肝）
+            document.body.classList.remove('xerox-force-music-mode');
+        }
 
         if (location.pathname === "/watch") {
             setTimeout(() => {
@@ -221,31 +235,28 @@ function onUrlChange() {
                 injectExtraButtons();
             }, 1000);
             setTimeout(() => {
-                // 遅延ロードされるメタデータを考慮して再実行
                 applyPlaybackTools();
                 injectExtraButtons();
             }, 3000);
-        } else if (location.pathname === "/" && settings.forceMusicCategory) {
-            enforceMusicCategoryLoop();
         }
     } catch (e) {}
 }
 
-// ホーム画面での音楽カテゴリ強制ループ
 function enforceMusicCategoryLoop() {
     if (!settings.forceMusicCategory || location.pathname !== "/") return;
     
-    // まだ選択されていなければトライ
     const interval = setInterval(() => {
+        // 途中で別ページに行ったら停止
         if (location.pathname !== "/") {
             clearInterval(interval);
+            document.body.classList.remove('xerox-force-music-mode');
             return;
         }
         
         const success = forceMusicCategorySelect();
         if (success) {
             document.body.classList.add('xerox-music-selected');
-            // 成功しても念のため少しの間監視を続ける（SPA遷移対策）
+            // 成功後もしばらく監視（SPA対策）
             setTimeout(() => clearInterval(interval), 2000);
         }
     }, 500);
@@ -258,7 +269,6 @@ function forceMusicCategorySelect() {
 
         for (const chip of chips) {
             const text = chip.innerText.trim();
-            // 日本語・英語対応
             if (text === "音楽" || text === "Music") {
                 musicChip = chip;
                 break;
@@ -267,13 +277,13 @@ function forceMusicCategorySelect() {
 
         if (musicChip) {
             if (musicChip.getAttribute('aria-selected') === 'true') {
-                return true; // 既に選択済み
+                return true; 
             } else {
                 musicChip.click();
-                return true; // クリックした
+                return true; 
             }
         }
-        return false; // 見つからない
+        return false; 
     } catch(e) { return false; }
 }
 
@@ -286,7 +296,13 @@ function applyStaticStyles() {
     toggleBodyClass('xerox-hide-chat', settings.hideChat);
     toggleBodyClass('xerox-hide-endscreen', settings.hideEndScreen);
     toggleBodyClass('xerox-fade-watched', settings.fadeWatched);
-    toggleBodyClass('xerox-force-music-mode', settings.forceMusicCategory);
+    
+    // 設定変更時の即時反映（ホーム以外ならクラスをつけない）
+    if (settings.forceMusicCategory && location.pathname === "/") {
+        document.body.classList.add('xerox-force-music-mode');
+    } else {
+        document.body.classList.remove('xerox-force-music-mode');
+    }
 }
 
 function toggleBodyClass(className, isActive) {
@@ -294,7 +310,7 @@ function toggleBodyClass(className, isActive) {
     else document.body.classList.remove(className);
 }
 
-// 音楽動画判定ロジック (強化版)
+// 音楽動画判定ロジック
 function isMusicVideo() {
     // 1. 公式アーティストバッジ (♪マーク)
     const badge = document.querySelector('ytd-channel-name .ytd-badge-supported-renderer');
@@ -302,10 +318,8 @@ function isMusicVideo() {
         const svgPath = badge.querySelector('path');
         if (svgPath) {
             const d = svgPath.getAttribute('d');
-            // ♪マークのパスデータの一部
             if (d && d.includes('M12 3v10.55')) return true;
         }
-        // ツールチップ確認
         const tooltip = badge.querySelector('tp-yt-paper-tooltip');
         if (tooltip) {
             const txt = tooltip.innerText.toLowerCase();
@@ -313,24 +327,24 @@ function isMusicVideo() {
         }
     }
 
-    // 2. チャンネル名が「- Topic」で終わる (自動生成チャンネル)
+    // 2. チャンネル名が「- Topic」で終わる
     const channelEl = document.querySelector('ytd-channel-name a');
     const channelName = channelEl ? channelEl.innerText.trim() : "";
     if (channelName.endsWith(' - Topic') || channelName.endsWith(' - トピック')) return true;
 
-    // 3. ミックスリスト再生中 (RDリストなど)
+    // 3. ミックスリスト再生中
     const urlParams = new URLSearchParams(window.location.search);
     const listId = urlParams.get('list');
     if (listId && (listId.startsWith('RD') || listId.startsWith('OLAK5uy_') || listId.startsWith('LM'))) return true;
 
-    // 4. メタデータセクション (曲・アーティスト情報)
+    // 4. メタデータセクション
     if (document.querySelector('ytd-rich-metadata-row-renderer')) return true;
     
-    // 5. 概要欄の自動生成クレジット ("Provided to YouTube")
+    // 5. 概要欄クレジット
     const description = document.querySelector('#description-inline-expander') || document.querySelector('#description');
     if (description && description.innerText.includes('Provided to YouTube')) return true;
 
-    // 6. タイトル・チャンネル名のキーワード判定 (補助)
+    // 6. キーワード判定
     const titleEl = document.querySelector('h1.ytd-watch-metadata');
     const title = titleEl ? titleEl.innerText.toLowerCase() : "";
     const channelLower = channelName.toLowerCase();
@@ -354,7 +368,6 @@ function applyPlaybackTools() {
         if (!video) return;
 
         if (settings.fixSpeed) {
-            // 音楽動画の場合は通常速度、それ以外は指定速度
             if (settings.disableSpeedForMusic && isMusicVideo()) {
                 video.playbackRate = 1.0;
             } else {
