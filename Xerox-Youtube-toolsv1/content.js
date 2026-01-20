@@ -45,7 +45,6 @@ try {
         observer.observe(document.body, { subtree: true, childList: true });
         onUrlChange();
 
-        // 初回ロード時のチェック
         if (location.pathname === "/" && settings.forceMusicCategory) {
             document.body.classList.add('xerox-force-music-mode');
             enforceMusicCategoryLoop();
@@ -74,7 +73,6 @@ async function saveSettings() {
     try {
         await chrome.storage.local.set({ xeroxSettings: settings });
         applyStaticStyles();
-        // 設定保存時も即時反映のためURLチェックを行う
         onUrlChange();
     } catch (e) {}
 }
@@ -127,13 +125,11 @@ function injectStyles() {
             display: none !important; 
         }
 
-        /* 音楽カテゴリ強制時、選択されるまではグリッドを隠してチラつき防止 */
         body.xerox-force-music-mode:not(.xerox-music-selected) ytd-rich-grid-renderer {
             opacity: 0 !important;
             pointer-events: none !important;
         }
         
-        /* 音楽カテゴリ以外のチップを非表示 */
         body.xerox-force-music-mode ytd-feed-filter-chip-bar-renderer yt-chip-cloud-chip-renderer:not([aria-selected="true"]) {
             display: none !important;
         }
@@ -217,15 +213,12 @@ function onUrlChange() {
             }
         }
         
-        // ページ遷移時は一度クラスをリセット
         document.body.classList.remove('xerox-music-selected');
 
-        // ホーム画面かつ設定ONの場合のみクラス付与
         if (location.pathname === "/" && settings.forceMusicCategory) {
             document.body.classList.add('xerox-force-music-mode');
             enforceMusicCategoryLoop();
         } else {
-            // ホーム以外なら強制モードクラスを削除（これがバグ修正の肝）
             document.body.classList.remove('xerox-force-music-mode');
         }
 
@@ -246,7 +239,6 @@ function enforceMusicCategoryLoop() {
     if (!settings.forceMusicCategory || location.pathname !== "/") return;
     
     const interval = setInterval(() => {
-        // 途中で別ページに行ったら停止
         if (location.pathname !== "/") {
             clearInterval(interval);
             document.body.classList.remove('xerox-force-music-mode');
@@ -256,7 +248,6 @@ function enforceMusicCategoryLoop() {
         const success = forceMusicCategorySelect();
         if (success) {
             document.body.classList.add('xerox-music-selected');
-            // 成功後もしばらく監視（SPA対策）
             setTimeout(() => clearInterval(interval), 2000);
         }
     }, 500);
@@ -297,7 +288,6 @@ function applyStaticStyles() {
     toggleBodyClass('xerox-hide-endscreen', settings.hideEndScreen);
     toggleBodyClass('xerox-fade-watched', settings.fadeWatched);
     
-    // 設定変更時の即時反映（ホーム以外ならクラスをつけない）
     if (settings.forceMusicCategory && location.pathname === "/") {
         document.body.classList.add('xerox-force-music-mode');
     } else {
@@ -310,9 +300,7 @@ function toggleBodyClass(className, isActive) {
     else document.body.classList.remove(className);
 }
 
-// 音楽動画判定ロジック
 function isMusicVideo() {
-    // 1. 公式アーティストバッジ (♪マーク)
     const badge = document.querySelector('ytd-channel-name .ytd-badge-supported-renderer');
     if (badge) {
         const svgPath = badge.querySelector('path');
@@ -327,24 +315,19 @@ function isMusicVideo() {
         }
     }
 
-    // 2. チャンネル名が「- Topic」で終わる
     const channelEl = document.querySelector('ytd-channel-name a');
     const channelName = channelEl ? channelEl.innerText.trim() : "";
     if (channelName.endsWith(' - Topic') || channelName.endsWith(' - トピック')) return true;
 
-    // 3. ミックスリスト再生中
     const urlParams = new URLSearchParams(window.location.search);
     const listId = urlParams.get('list');
     if (listId && (listId.startsWith('RD') || listId.startsWith('OLAK5uy_') || listId.startsWith('LM'))) return true;
 
-    // 4. メタデータセクション
     if (document.querySelector('ytd-rich-metadata-row-renderer')) return true;
     
-    // 5. 概要欄クレジット
     const description = document.querySelector('#description-inline-expander') || document.querySelector('#description');
     if (description && description.innerText.includes('Provided to YouTube')) return true;
 
-    // 6. キーワード判定
     const titleEl = document.querySelector('h1.ytd-watch-metadata');
     const title = titleEl ? titleEl.innerText.toLowerCase() : "";
     const channelLower = channelName.toLowerCase();
@@ -402,12 +385,12 @@ function injectExtraButtons() {
 
         const ssBtn = document.createElement('button');
         ssBtn.className = 'xerox-tool-btn';
-        ssBtn.innerText = '📷 スクショ';
+        ssBtn.innerText = 'スクショ';
         ssBtn.onclick = takeScreenshot;
 
         const urlBtn = document.createElement('button');
         urlBtn.className = 'xerox-tool-btn';
-        urlBtn.innerText = '🔗 時間URL';
+        urlBtn.innerText = '時間URL';
         urlBtn.onclick = copyTimestampUrl;
 
         container.appendChild(ssBtn);
@@ -475,7 +458,7 @@ function generatePanelHTML() {
     html += createToggle('便利ボタンを表示', 'showExtraButtons');
 
     html += '<div class="xerox-section-title">表示の整理</div>';
-    html += createToggle('ホームで「音楽」タブを自動選択', 'forceMusicCategory');
+    html += createToggle('ホームで音楽のみ表示', 'forceMusicCategory');
     html += createToggle('関連動画を非表示', 'hideRelated');
     html += createToggle('コメント欄を隠す', 'hideComments');
     html += createToggle('ライブチャットを隠す', 'hideChat');
